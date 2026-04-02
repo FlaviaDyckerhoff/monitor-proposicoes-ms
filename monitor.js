@@ -7,7 +7,7 @@ const EMAIL_SENHA = process.env.EMAIL_SENHA;
 const ARQUIVO_ESTADO = 'estado.json';
 
 // API do SGPL da ALEMS — endpoint descoberto via DevTools (GET com query params)
-const API_BASE = 'https://sgpl.consulta.al.ms.gov.br/sgpl-publico/hal/public';
+const API_BASE = 'https://sgpl.consulta.al.ms.gov.br/sgpl/sgpl-api/public';
 
 function carregarEstado() {
   if (fs.existsSync(ARQUIVO_ESTADO)) {
