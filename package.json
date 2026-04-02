@@ -1,0 +1,15 @@
+{
+  "name": "monitor-proposicoes-ms",
+  "version": "1.0.0",
+  "description": "Monitor automático de proposições da ALEMS (Mato Grosso do Sul)",
+  "main": "monitor.js",
+  "scripts": {
+    "start": "node monitor.js"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
