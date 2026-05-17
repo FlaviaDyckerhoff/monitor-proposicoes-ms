@@ -153,15 +153,13 @@ async function buscarPagina(page) {
 
   if (!response.ok) {
     const texto = await response.text();
-    console.error(`❌ Erro ${response.status}: ${texto.substring(0, 300)}`);
-    return null;
+    throw new Error(`Erro na API: ${response.status} ${response.statusText} — ${texto.substring(0, 300)}`);
   }
   return await response.json();
 }
 
 async function buscarTodasProposicoes() {
   const primeira = await buscarPagina(1);
-  if (!primeira) return [];
 
   let lista = [];
   let totalPaginas = 1;
