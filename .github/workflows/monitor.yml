@@ -1,5 +1,8 @@
 name: Monitor Proposições MS
 
+env:
+  TZ: America/Sao_Paulo
+
 on:
   schedule:
     - cron: '20 11 * * *'   # 08:20 BRT
