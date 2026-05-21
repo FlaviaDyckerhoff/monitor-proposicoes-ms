@@ -107,7 +107,7 @@ async function enviarEmail(novas) {
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:960px;margin:0 auto">
       <h2 style="color:#003366;border-bottom:2px solid #003366;padding-bottom:8px">
-        🏛️ ALEMS — ${novas.length} nova(s) proposição(ões)
+        🏛️ Assembleia Legislativa de Mato Grosso do Sul — ${novas.length} nova(s) proposição(ões)
       </h2>
       <p style="color:#666;margin-top:0">Monitoramento automático — ${new Date().toLocaleString('pt-BR')}</p>
       <table style="width:100%;border-collapse:collapse;font-size:14px">
@@ -122,15 +122,15 @@ async function enviarEmail(novas) {
         <tbody>${linhas}</tbody>
       </table>
       <p style="margin-top:16px;font-size:12px;color:#999">
-        <a href="https://sgpl.consulta.al.ms.gov.br/sgpl-publico/#/busca-proposicoes" style="color:#003366">Abrir portal ALEMS</a>
+        <a href="https://sgpl.consulta.al.ms.gov.br/sgpl-publico/#/busca-proposicoes" style="color:#003366">Abrir portal da Assembleia Legislativa de Mato Grosso do Sul</a>
       </p>
     </div>
   `;
 
   await transporter.sendMail({
-    from: `"Monitor ALEMS" <${EMAIL_REMETENTE}>`,
+    from: `"Monitor Mato Grosso do Sul" <${EMAIL_REMETENTE}>`,
     to: EMAIL_DESTINO,
-    subject: `🏛️ ALEMS: ${novas.length} nova(s) proposição(ões) — ${new Date().toLocaleDateString('pt-BR')}`,
+    subject: `🏛️ Mato Grosso do Sul: ${novas.length} nova(s) proposição(ões) — ${new Date().toLocaleDateString('pt-BR')}`,
     html,
   });
 
