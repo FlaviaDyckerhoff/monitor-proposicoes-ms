@@ -7,6 +7,7 @@ const EMAIL_SENHA = process.env.EMAIL_SENHA;
 
 const API_BASE = 'https://sgpl.consulta.al.ms.gov.br/sgpl/sgpl-api/public';
 const URL_PROPOSICAO = 'https://sgpl.consulta.al.ms.gov.br/sgpl-publico/#/linha-tempo?idProposicao=';
+const MAX_PAGINAS_COLETA = 50;
 
 // Tipos que merecem destaque de número de projeto no email
 const SIGLAS_PROJETO = ['PL', 'PLC'];
@@ -215,7 +216,7 @@ async function buscarTodasProposicoes() {
     console.log('📦 Estrutura desconhecida:', JSON.stringify(primeira).substring(0, 200));
   }
 
-  const maxPaginas = Math.min(totalPaginas, 5);
+  const maxPaginas = Math.min(totalPaginas, MAX_PAGINAS_COLETA);
   for (let page = 2; page <= maxPaginas; page++) {
     const dados = await buscarPagina(page);
     if (!dados) break;
