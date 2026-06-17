@@ -8,6 +8,8 @@ const EMAIL_SENHA = process.env.EMAIL_SENHA;
 const API_BASE = 'https://sgpl.consulta.al.ms.gov.br/sgpl/sgpl-api/public';
 const URL_PROPOSICAO = 'https://sgpl.consulta.al.ms.gov.br/sgpl-publico/#/linha-tempo?idProposicao=';
 const MAX_PAGINAS_COLETA = 50;
+const MAX_NOVAS_SEM_TRAVA = 200;
+const DIAS_RETROATIVOS_SEGUROS = 30;
 
 // Tipos que merecem destaque de número de projeto no email
 const SIGLAS_PROJETO = ['PL', 'PLC'];
@@ -40,8 +42,13 @@ function normalizarProposicao(p) {
     : protocolo;
 
   let data = '-';
+  let dataLeituraISO = null;
   if (p.dataLeitura) {
-    try { data = new Date(p.dataLeitura).toLocaleDateString('pt-BR'); } catch (_) {}
+    try {
+      const parsed = new Date(p.dataLeitura);
+      data = parsed.toLocaleDateString('pt-BR');
+      dataLeituraISO = parsed.toISOString();
+    } catch (_) {}
   }
 
   return {
@@ -54,9 +61,34 @@ function normalizarProposicao(p) {
     numero: numProtocolo,
     autores: p.autores || '-',
     data,
+    dataLeituraISO,
     ementa: (p.resumo || p.resumoPesquisaFulltext || '-'),
     link: `${URL_PROPOSICAO}${p.id}`,
     visivel: p.visivel,
+  };
+}
+
+function dataLeituraMs(p) {
+  if (!p.dataLeituraISO) return null;
+  const ms = Date.parse(p.dataLeituraISO);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function loteRetroativoSuspeito(novas) {
+  if (novas.length <= MAX_NOVAS_SEM_TRAVA) return null;
+
+  const cutoff = Date.now() - (DIAS_RETROATIVOS_SEGUROS * 24 * 60 * 60 * 1000);
+  const antigas = novas.filter(p => {
+    const ms = dataLeituraMs(p);
+    return ms !== null && ms < cutoff;
+  });
+
+  if (antigas.length / novas.length < 0.5) return null;
+
+  return {
+    total: novas.length,
+    antigas: antigas.length,
+    cutoff: new Date(cutoff).toISOString(),
   };
 }
 
@@ -170,6 +202,41 @@ async function enviarEmail(novas) {
   console.log(`✅ Email enviado com ${novas.length} proposições novas.`);
 }
 
+async function enviarAlertaLoteSuspeito(novas, diagnostico) {
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: EMAIL_REMETENTE, pass: EMAIL_SENHA },
+  });
+
+  const exemplos = novas.slice(0, 15).map(p =>
+    `<li><a href="${p.link}" style="color:#003366">${p.rotulo}</a> — ${p.data} — ${p.autores}</li>`
+  ).join('');
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto">
+      <h2 style="color:#8a4b00;border-bottom:2px solid #8a4b00;padding-bottom:8px">
+        ⚠️ Monitor MS: lote retroativo bloqueado
+      </h2>
+      <p>O monitor encontrou <strong>${diagnostico.total}</strong> proposições ainda não vistas, mas <strong>${diagnostico.antigas}</strong> têm Data Leitura anterior aos últimos ${DIAS_RETROATIVOS_SEGUROS} dias.</p>
+      <p>Para evitar repetir o erro de enviar acervo antigo como “novidade”, o lote foi usado apenas para atualizar o estado interno.</p>
+      <p style="margin-bottom:4px"><strong>Primeiros exemplos do lote bloqueado:</strong></p>
+      <ul>${exemplos}</ul>
+      <p style="margin-top:16px;font-size:12px;color:#999">
+        <a href="https://sgpl.consulta.al.ms.gov.br/sgpl-publico/#/busca-proposicoes" style="color:#003366">Abrir portal da Assembleia Legislativa de Mato Grosso do Sul</a>
+      </p>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"Monitor Mato Grosso do Sul" <${EMAIL_REMETENTE}>`,
+    to: EMAIL_DESTINO,
+    subject: `⚠️ Mato Grosso do Sul: lote retroativo bloqueado — ${new Date().toLocaleDateString('pt-BR')}`,
+    html,
+  });
+
+  console.log(`⚠️ Alerta operacional enviado: lote retroativo bloqueado com ${diagnostico.total} itens.`);
+}
+
 async function buscarPagina(page) {
   const params = new URLSearchParams({
     direction: 'desc',
@@ -257,7 +324,13 @@ async function buscarTodasProposicoes() {
   console.log(`🆕 Proposições novas: ${novas.length}`);
 
   if (novas.length > 0) {
-    await enviarEmail(novas);
+    const diagnosticoLoteSuspeito = loteRetroativoSuspeito(novas);
+    if (diagnosticoLoteSuspeito) {
+      console.log(`⚠️ Lote retroativo suspeito: ${diagnosticoLoteSuspeito.total} novas, ${diagnosticoLoteSuspeito.antigas} antigas. Bloqueando email detalhado.`);
+      await enviarAlertaLoteSuspeito(novas, diagnosticoLoteSuspeito);
+    } else {
+      await enviarEmail(novas);
+    }
     novas.forEach(p => idsVistos.add(String(p.id)));
     estado.proposicoes_vistas = Array.from(idsVistos);
   } else {
