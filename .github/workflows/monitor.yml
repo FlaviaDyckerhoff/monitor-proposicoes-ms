@@ -4,8 +4,6 @@ env:
   TZ: America/Sao_Paulo
 
 on:
-  schedule:
-    - cron: '40 8 * * 1-5'   # 05:40 BRT
   workflow_dispatch:
 
 concurrency:
