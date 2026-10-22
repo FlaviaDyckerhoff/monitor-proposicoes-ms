@@ -9,6 +9,7 @@ function fichaEmailButtonHtml() {
 }
 
 const fs = require('fs');
+const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 let promoverInteresseClienteProposicao = (_item, atuais) => Array.isArray(atuais) ? atuais : [];
 try {
@@ -43,10 +44,69 @@ const CONTROLE03_BASIC_AUTH = process.env.CONTROLE03_BASIC_AUTH || '';
 
 
 const API_BASE = 'https://sgpl.consulta.al.ms.gov.br/sgpl/sgpl-api/public';
+const CAPTCHA_CHALLENGE_URL = `${API_BASE}/captcha/challenge`;
+const CAPTCHA_CLIENT_ID = 'monitor-legislativo:proposicoes-ms';
 const URL_PROPOSICAO = 'https://sgpl.consulta.al.ms.gov.br/sgpl-publico/#/linha-tempo?idProposicao=';
 const MAX_PAGINAS_COLETA = 50;
 const MAX_NOVAS_SEM_TRAVA = 200;
 const DIAS_RETROATIVOS_SEGUROS = 30;
+
+function hashTemZerosIniciais(hash, complexidade) {
+  const bytesInteiros = Math.floor(complexidade / 8);
+  const bitsRestantes = complexidade % 8;
+  for (let i = 0; i < bytesInteiros; i++) {
+    if (hash[i] !== 0) return false;
+  }
+  return bitsRestantes === 0 || (hash[bytesInteiros] >> (8 - bitsRestantes)) === 0;
+}
+
+function resolverCaptchaPow(prefixo, complexidade, dadoExtra) {
+  for (let tentativa = 0; tentativa < 10000000; tentativa++) {
+    const nonce = tentativa.toString(16);
+    const hash = crypto.createHash('sha256').update(prefixo + dadoExtra + nonce).digest();
+    if (hashTemZerosIniciais(hash, complexidade)) return nonce;
+  }
+  throw new Error('CAPTCHA PoW da ALEMS excedeu o limite de tentativas');
+}
+
+async function fetchApiAlems(url, tentativas = 2) {
+  let ultimoErro = null;
+  for (let tentativa = 1; tentativa <= tentativas; tentativa++) {
+    try {
+      const desafioResp = await fetch(CAPTCHA_CHALLENGE_URL, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0',
+          'X-Captcha-Client-Id': CAPTCHA_CLIENT_ID,
+        },
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!desafioResp.ok) throw new Error(`Erro ao obter desafio ALEMS: HTTP ${desafioResp.status}`);
+
+      const desafio = await desafioResp.json();
+      const dadoExtra = Date.now().toString();
+      const nonce = resolverCaptchaPow(desafio.prefix, Number(desafio.complexity || 0), dadoExtra);
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0',
+          'X-Captcha-Challenge': desafio.challengeId,
+          'X-Captcha-Nonce': nonce,
+          'X-Captcha-Extra': dadoExtra,
+        },
+        signal: AbortSignal.timeout(30000),
+      });
+      if (response.ok) return response;
+
+      const texto = await response.text();
+      ultimoErro = new Error(`Erro na API: ${response.status} ${response.statusText} — ${texto.substring(0, 300)}`);
+      if (![403, 429].includes(response.status)) throw ultimoErro;
+    } catch (err) {
+      ultimoErro = err;
+    }
+  }
+  throw ultimoErro;
+}
 
 // Tipos que merecem destaque de número de projeto no email
 const SIGLAS_PROJETO = ['PL', 'PLC'];
@@ -665,14 +725,7 @@ async function buscarPagina(page) {
   const url = `${API_BASE}/proposicao?${params}`;
   console.log(`🔍 Buscando página ${page}: ${url}`);
 
-  const response = await fetch(url, {
-    headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
-  });
-
-  if (!response.ok) {
-    const texto = await response.text();
-    throw new Error(`Erro na API: ${response.status} ${response.statusText} — ${texto.substring(0, 300)}`);
-  }
+  const response = await fetchApiAlems(url);
   return await response.json();
 }
 
