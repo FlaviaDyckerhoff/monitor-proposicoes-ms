@@ -5,6 +5,15 @@ env:
 
 on:
   workflow_dispatch:
+    inputs:
+      controle03_force_latest:
+        description: "Recuperação controlada da última rodada no Radar 03, sem reenviar email"
+        required: false
+        default: "0"
+      controle03_replay_state_ref:
+        description: "SHA completo do estado anterior para replay controlado"
+        required: false
+        default: ""
 
 concurrency:
   group: monitor-proposicoes-ms
@@ -30,6 +39,17 @@ jobs:
       - name: Instalar dependências
         run: npm install
 
+      - name: Restaurar estado anterior para replay controlado
+        if: ${{ github.event.inputs.controle03_replay_state_ref != '' }}
+        env:
+          REPLAY_STATE_REF: ${{ github.event.inputs.controle03_replay_state_ref }}
+        run: |
+          if [[ ! "$REPLAY_STATE_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "SHA de replay inválido"
+            exit 1
+          fi
+          git show "$REPLAY_STATE_REF:estado.json" > estado.json
+
       - name: Executar monitor
         env:
           EMAIL_REMETENTE: ${{ secrets.EMAIL_REMETENTE }}
@@ -38,6 +58,7 @@ jobs:
           CONTROLE03_API_USER: ${{ secrets.CONTROLE03_API_USER }}
           CONTROLE03_API_PASS: ${{ secrets.CONTROLE03_API_PASS }}
           CONTROLE03_STATE_URL: ${{ secrets.CONTROLE03_STATE_URL }}
+          CONTROLE03_FORCE_LATEST: ${{ github.event.inputs.controle03_force_latest || '0' }}
         run: node monitor.js
 
       - name: Salvar estado atualizado no repositório
