@@ -48,6 +48,7 @@ jobs:
             echo "SHA de replay inválido"
             exit 1
           fi
+          git fetch --no-tags --depth=1 origin "$REPLAY_STATE_REF"
           git show "$REPLAY_STATE_REF:estado.json" > estado.json
 
       - name: Executar monitor
