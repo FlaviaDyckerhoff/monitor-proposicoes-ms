@@ -595,6 +595,24 @@ function renderRadar03EmailButton(novas) {
 }
 
 
+// Foco solicitado por Flavia em 12/11/2026 (DM46218): rumor não é ato confirmado.
+function candidatoAlertaIcmsMs(p) {
+  const texto = String(p.ementa || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  // Triagem ampla: não exigir percentuais nem autoria na ementa para não perder alterações indiretas.
+  return /\bicms\b|aliquota|codigo tributario|lei\s*(?:n[.º°o]*\s*)?2[. ]?315|pacote fiscal|ajuste fiscal|carga tributaria/.test(texto);
+}
+
+function renderAlertaIcmsMs(novas) {
+  const candidatos = novas.filter(candidatoAlertaIcmsMs);
+  const itens = candidatos.map(p => '<li><a href="' + mlEscapeHtmlClienteDestaque(p.link) + '">' + mlEscapeHtmlClienteDestaque(p.rotulo) + '</a> — ' + mlEscapeHtmlClienteDestaque(p.ementa) + '</li>').join('');
+  return '<div style="background:#fff4d6;border:1px solid #d7a42c;border-radius:6px;padding:12px 14px;margin:12px 0;color:#173d63;font-size:14px;line-height:1.5">' +
+    '<strong>⚠️ Atenção — ICMS/MS</strong><br>' +
+    'Verificar propostas do Governo de MS que elevem a alíquota do ICMS, especialmente de 17% para 21%. Conferir alíquota modal, alterações no Código Tributário e pacotes fiscais, inclusive quando a ementa não mencionar o aumento. Ler o texto integral antes de confirmar a mudança.<br>' +
+    '<strong>Informação a confirmar:</strong> 17% → 21% não significa proposta apresentada ou aumento aprovado.' +
+    (candidatos.length ? '<br><strong>Triagem temática — conferir autoria e íntegra:</strong><ul>' + itens + '</ul>' : '<br>Nenhuma correspondência temática nas ementas deste lote; isso não prova ausência de proposta ou de alteração na íntegra.') +
+    '</div>';
+}
+
 async function enviarEmail(novas) {
   if (CONTROLE03_FORCE_LATEST) {
     console.log('📌 Modo Controle 03: email de novidades não enviado.');
@@ -653,6 +671,7 @@ async function enviarEmail(novas) {
         🏛️ Assembleia Legislativa de Mato Grosso do Sul — ${novas.length} nova(s) proposição(ões)
       </h2>
       <p style="color:#666;margin-top:0">Monitoramento automático — ${new Date().toLocaleString('pt-BR')}</p>
+      ${renderAlertaIcmsMs(novas)}
       <table style="width:100%;border-collapse:collapse;font-size:14px">
         <thead>
           <tr style="background:#003366;color:white">
